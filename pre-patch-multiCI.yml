@@ -1,0 +1,55 @@
+---
+################
+# Overview: Playbook to take pre-patch report from the target server in multiple CIs.
+################
+- name: Taking Pre-Patch Report for multiple CIs
+  hosts: unix
+  remote_user: root
+  become: true
+
+  tasks:
+  - name: Taking updated pakages on RHEL/CentOS
+    shell: yum list updates | sed -n '/Updated/,$p' | sed '/Uploading/,$d' | grep -v "Updated" | awk '{print $1","$2}'
+    register: list_updates
+    when: ansible_distribution == "CentOS" or ansible_distribution == "RedHat"
+
+  - name: Create tempfile
+    copy:
+      dest: /tmp/{{ hostname }}-pre-patch.csv
+      content: "{{ list_updates.stdout }}"
+    when: list_updates.changed
+
+  - name: Taking updated pakages on Ubuntu
+    shell: apt-get upgrade --dry-run | grep -A 5000  -i 'installed'
+    register: list_updates
+    when: ansible_distribution == "Ubuntu"
+
+  - name: Create tempfile
+    copy:
+      dest: /tmp/{{ hostname }}-pre-patch.csv
+      content: "{{ list_updates.stdout}}"
+    when: list_updates.changed
+
+  - name: Create a zip archive of /path/to/foo
+    archive:
+      path: /tmp/*-pre-patch.csv
+      dest: /tmp/pre-patch-report.zip
+      format: zip
+
+  - name: copying the file
+    fetch:
+      src: /tmp/pre-patch-report.zip
+      dest: /tmp/pre-patch-report.zip
+      flat: yes
+
+  - mail:
+     host: 10.72.217.36
+     port: 25
+     subject: Pre-Patch Report
+     body: Hello, Please find the pre-patch report attachment
+     from: ansible@tatacommunications.com (Script Vault)
+     to: Ajay.Paul2@tatacommunications.com
+     attach: /tmp/{{ param1 }}-pre-patch.csv
+     headers: 'Reply-To=ansible@tatacommunications.com'
+     charset: utf8
+    delegate_to: localhost

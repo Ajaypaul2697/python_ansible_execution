@@ -1,0 +1,70 @@
+---
+ - name: Ping,reboot and service status checking playbook
+   hosts: localhost
+   connection: local
+   gather_facts: false
+  
+   vars:
+     server_reach: "Server is Reachable"
+     server_reach_fail: "Couldn't able to reach the server "
+     winrm_check_fail: "WinRM is not enabled in the server"
+     winrm_check_success: "WinRm is enabled"
+   tasks:
+   # - name: Checking the Reachability of the server
+    #  win_command: cmd.exe -
+     # args:
+      #  stdin: ping "{{ windows }}" 
+     # register: server_reach
+
+
+    - name: Checking the WinRM Status
+      wait_for:
+        port: 5985
+        host: "{{ item }}"
+        timeout: 10
+      connection: local
+      with_items: "{{ groups.windows }}"
+      register: winrm_check
+      ignore_errors: true
+
+   # - name: Failed to Connect to WinRM
+    #  debug:
+    #    msg: "{{ winrm_check }}"
+    #  when : "winrm_check.results.failed == true"
+     
+   # - name: winRM status OK
+    #  debug:
+     #   msg: "{{ winrm_check }}"
+    #  when : "winrm_check.results.failed == false"
+
+ - hosts: windows
+   vars: 
+     service_status: "Nimsoft service is not Running"
+     service_true: "Nimsoft service is Running"
+   tasks:
+    - name: pinging the server
+      win_ping:
+      
+    - name: Getting the uptime of the server
+      win_command: cmd.exe -
+      args:
+        stdin: systeminfo | find "Boot Time"
+      register: boottime
+        
+    - name: print the output 
+      debug: 
+        msg: "{{ boottime.stdout_lines }}"
+        
+    - name: Check if the service exists
+      win_command: powershell.exe -
+      args:
+        stdin: Get-Service NimbusWatcherService -ErrorAction SilentlyContinue
+      register: result
+      ignore_errors: yes
+    
+    - name: print the output
+      debug:
+        msg: "{{ result.stdout_lines }}"
+
+
+        
